@@ -1,6 +1,3 @@
-//$npm install js-sha3
-//This allows the call to keccak256 in .js
-keccak256 = require('js-sha3').keccak256;
 var Remittance = artifacts.require("./Remittance.sol");
 
 contract('Remittance', function(accounts) {
@@ -11,8 +8,8 @@ contract('Remittance', function(accounts) {
     var bob = accounts[2];
     var carol = accounts[3];
 
-    var password1 = "123456";
-    var password2 = "asd123";
+    var password1 = web3.sha3("123456", { encoding: 'hex' });
+    var password2 = web3.sha3("asd123", { encoding: 'hex' });
 
     before (() => {
         return Remittance.new(alice, bob, carol, password1, password2, {from:owner}).then((i) => {
@@ -28,7 +25,7 @@ contract('Remittance', function(accounts) {
         return instance.viewFunds.call().then((r) => {
             fundsBefore = r;
                 console.log("  fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
-            return instance.addFunds({from:alice, value:web3.toWei(0.2, "ether")});
+            return instance.sendTransaction({from:alice, value:web3.toWei(0.2, "ether")});
         }).then(() => {
             return instance.viewFunds.call();
         }).then((r) => {
@@ -57,6 +54,7 @@ contract('Remittance', function(accounts) {
     });
 
     it("Check deadline is still valid", () => {
+        console.log("it:Check deadline is still valid");
         return instance.checkDeadLine.call().then((r) => {
             if (r == 0) {
                 return instance.setDeadLine.call(1000).then((r) => {
@@ -71,21 +69,14 @@ contract('Remittance', function(accounts) {
     it("Carol transfers funds to her exchange", () => {
         let fundsBefore, fundsAfter;
         let transferAmount = web3.toWei(0.1, "ether");
-        let pwd1, pwd2;
 
         console.log("it: Carol transfers funds to her exchange");
+        console.log("  Carol funds before = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
 
-        return instance.getPasswords.call({from: alice}).then((p) => {
-            pwd1 = p[0];
-            pwd2 = p[1];
-                //console.log("  pwd1 = " + pwd1);
-                //console.log("  pwd2 = " + pwd2);
-                console.log("  Carol funds before = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
-            return instance.viewFunds.call();
-        }).then((r) => {
+        return instance.viewFunds.call().then((r) => {
             fundsBefore = r.toNumber();
                 console.log("  Contract fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
-            return instance.fundsToExchange(pwd1, pwd2, transferAmount, {from:carol});
+            return instance.fundsToExchange(password1, password2, transferAmount, {from:carol});
         }).then(() => {
                 console.log("  transferAmount = " + web3.fromWei(transferAmount,"ether").toString(10));
             return instance.viewFunds.call();
@@ -103,11 +94,11 @@ contract('Remittance', function(accounts) {
 
         console.log("it:Carol transfer funds to Bob");
         console.log("  Carol funds before = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
-        
+
         bobFundsBefore = web3.fromWei(web3.eth.getBalance(bob),"ether");
             console.log("  Bob funds before = " + bobFundsBefore.toFixed(5).toString(10));
             console.log("  Transfer amount = " + web3.fromWei(transferAmount,"ether").toString(10));
-        
+
         return instance.exchangeToBeneficiary({from:carol, value:transferAmount}).then(() => {
             bobFundsAfter = web3.fromWei(web3.eth.getBalance(bob),"ether");
                 console.log("  Bob funds after = " + bobFundsAfter.toFixed(5).toString(10));
@@ -117,4 +108,26 @@ contract('Remittance', function(accounts) {
             assert.equal ((+bobFundsBefore + +t).toFixed(5), (+bobFundsAfter).toFixed(5), "ERROR: Bob funds doesn't match");
         });
     });
+
+    function keccak256(...args) {
+        args = args.map(arg => {
+          if (typeof arg === 'string') {
+            if (arg.substring(0, 2) === '0x') {
+                return arg.slice(2)
+            } else {
+                return web3.toHex(arg).slice(2)
+            }
+          }
+
+          if (typeof arg === 'number') {
+            return leftPad((arg).toString(16), 64, 0)
+          } else {
+            return ''
+          }
+        })
+
+        args = args.join('')
+
+        return web3.sha3(args, { encoding: 'hex' })
+      }
 });
