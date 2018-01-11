@@ -46,9 +46,8 @@ contract Remittance {
         deadLine = now + 1000; //default deadline
     }
 
-    function kill() onlyOwner public returns(bool) {
+    function kill() onlyOwner public {
         selfdestruct(owner);
-        return true;
     }
 
     function () public payable {}
