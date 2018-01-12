@@ -50,8 +50,6 @@ contract Remittance {
         selfdestruct(owner);
     }
 
-    function () public payable {}
-
     modifier onlyOwner() {
         require(msg.sender == owner);
         _;
@@ -65,6 +63,10 @@ contract Remittance {
     modifier onlyExchange() {
         require (msg.sender == exchange);
         _;
+    }
+
+    function addFunds() public payable returns(bool) {
+        return true;
     }
 
     function viewFunds() public returns(uint) {

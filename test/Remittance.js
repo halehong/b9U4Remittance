@@ -25,7 +25,7 @@ contract('Remittance', function(accounts) {
         return instance.viewFunds.call().then((r) => {
             fundsBefore = r;
                 console.log("  fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
-            return instance.sendTransaction({from:alice, value:web3.toWei(0.2, "ether")});
+            return instance.addFunds({from:alice, value:web3.toWei(0.2, "ether")});
         }).then(() => {
             return instance.viewFunds.call();
         }).then((r) => {
