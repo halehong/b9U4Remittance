@@ -12,6 +12,14 @@ contract Base {
     event LogBaseResume();
     event LogBaseRefund(address _address, uint _amount);
 
+    function getOwner() public constant returns (address _owner) {
+        return owner;
+    }
+
+    function getIsPaused() public constant returns (bool _isPaused) {
+        return isPaused;
+    }
+
     function Base() public {
         owner = msg.sender;
     }
