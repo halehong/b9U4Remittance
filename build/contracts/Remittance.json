@@ -3,6 +3,14 @@
   "abi": [
     {
       "constant": false,
+      "inputs": [],
+      "name": "resume",
+      "outputs": [],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": false,
       "inputs": [
         {
           "name": "_amount",
@@ -12,8 +20,8 @@
       "name": "withdrawFunds",
       "outputs": [
         {
-          "name": "",
-          "type": "bool"
+          "name": "_availableFunds",
+          "type": "uint256"
         }
       ],
       "payable": false,
@@ -30,7 +38,7 @@
       "name": "setDeadLine",
       "outputs": [
         {
-          "name": "",
+          "name": "_deadLine",
           "type": "uint256"
         }
       ],
@@ -39,25 +47,21 @@
     },
     {
       "constant": false,
-      "inputs": [],
-      "name": "viewFunds",
-      "outputs": [
+      "inputs": [
         {
-          "name": "",
+          "name": "_address",
+          "type": "address"
+        },
+        {
+          "name": "_amount",
           "type": "uint256"
         }
       ],
-      "payable": false,
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "beneficiary",
+      "name": "refund",
       "outputs": [
         {
-          "name": "",
-          "type": "address"
+          "name": "success",
+          "type": "bool"
         }
       ],
       "payable": false,
@@ -72,12 +76,25 @@
       "type": "function"
     },
     {
-      "constant": false,
+      "constant": true,
       "inputs": [],
-      "name": "getDeadLine",
+      "name": "getTransferredAmount",
       "outputs": [
         {
-          "name": "",
+          "name": "_transferredAmount",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "getAvailableFunds",
+      "outputs": [
+        {
+          "name": "_availableFunds",
           "type": "uint256"
         }
       ],
@@ -87,78 +104,21 @@
     {
       "constant": false,
       "inputs": [],
-      "name": "exchangeToBeneficiary",
+      "name": "addCommissionFunds",
       "outputs": [
         {
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": true,
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "owner",
-      "outputs": [
-        {
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "payable": false,
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "origin",
-      "outputs": [
-        {
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "payable": false,
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [],
-      "name": "addFunds",
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": true,
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "exchange",
-      "outputs": [
-        {
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "payable": false,
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [],
-      "name": "checkDeadLine",
-      "outputs": [
-        {
-          "name": "",
+          "name": "_commissionToExchangeAmount",
           "type": "uint256"
         }
       ],
+      "payable": true,
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "pause",
+      "outputs": [],
       "payable": false,
       "type": "function"
     },
@@ -174,15 +134,98 @@
           "type": "bytes32"
         },
         {
+          "name": "_commission",
+          "type": "uint256"
+        }
+      ],
+      "name": "sendFundsToExchange",
+      "outputs": [
+        {
+          "name": "_success",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
           "name": "_amount",
           "type": "uint256"
         }
       ],
-      "name": "fundsToExchange",
+      "name": "withdrawCommissionFunds",
       "outputs": [
         {
-          "name": "",
+          "name": "_commissionToExchangeAmount",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "addFunds",
+      "outputs": [
+        {
+          "name": "_availableFunds",
+          "type": "uint256"
+        }
+      ],
+      "payable": true,
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "getTransferredCommission",
+      "outputs": [
+        {
+          "name": "_transferredCommission",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "sendFundsFromExchangeToBeneficiary",
+      "outputs": [
+        {
+          "name": "_success",
           "type": "bool"
+        }
+      ],
+      "payable": true,
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "checkDeadLine",
+      "outputs": [
+        {
+          "name": "_deadline",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "getCommissionFunds",
+      "outputs": [
+        {
+          "name": "_commissionToExchangeAmount",
+          "type": "uint256"
         }
       ],
       "payable": false,
@@ -213,17 +256,332 @@
       ],
       "payable": false,
       "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_deadLine",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceNew",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "_availableFunds",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceAddFunds",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "_availableFunds",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceWithdrawFunds",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "_commissionToExchangeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceAddCommissionFunds",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "_commissionToExchangeAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceWithdrawCommissionFunds",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_newDeadLine",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceSetDeadLine",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceSendFundsToExchange",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceSendFundsFromExchangeToBeneficiary",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_commissionToTransfer",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogRemittanceSendCommissionToExchange",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "LogBasePause",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "LogBaseResume",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "_address",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "LogBaseRefund",
+      "type": "event"
     }
   ],
-  "unlinked_binary": "0x6060604052341561000f57600080fd5b60405160a0806105df83398101604052808051919060200180519190602001805191906020018051919060200180519150505b60008054600160a060020a03338116600160a060020a03199283161790925560018054888416908316179055600280548784169083161790556003805492861692909116919091179055600482905560058190556103e842016006555b50505050505b61052b806100b46000396000f300606060405236156100a95763ffffffff60e060020a600035041663155dd5ee81146100ae578063341c45c0146100d8578063379b24951461010057806338af3eed1461012557806341c0e1b51461015457806361d0acbb146101695780636723a99d1461018e5780638da5cb5b146101aa578063938b5f32146101d9578063a26759cb14610208578063d2f7265a14610224578063de064c1c14610253578063e0b99f0014610278575b600080fd5b34156100b957600080fd5b6100c46004356102a8565b604051901515815260200160405180910390f35b34156100e357600080fd5b6100ee600435610319565b60405190815260200160405180910390f35b341561010b57600080fd5b6100ee610355565b60405190815260200160405180910390f35b341561013057600080fd5b610138610364565b604051600160a060020a03909116815260200160405180910390f35b341561015f57600080fd5b610167610373565b005b341561017457600080fd5b6100ee61039f565b60405190815260200160405180910390f35b6100c46103a6565b604051901515815260200160405180910390f35b34156101b557600080fd5b610138610400565b604051600160a060020a03909116815260200160405180910390f35b34156101e457600080fd5b61013861040f565b604051600160a060020a03909116815260200160405180910390f35b6100c461041e565b604051901515815260200160405180910390f35b341561022f57600080fd5b610138610424565b604051600160a060020a03909116815260200160405180910390f35b341561025e57600080fd5b6100ee610433565b60405190815260200160405180910390f35b341561028357600080fd5b6100c460043560243560443561045c565b604051901515815260200160405180910390f35b60015460009033600160a060020a039081169116146102c657600080fd5b600160a060020a03301631829010156102de57600080fd5b600160a060020a03331682156108fc0283604051600060405180830381858888f19350505050151561030f57600080fd5b5060015b5b919050565b60015460009033600160a060020a0390811691161461033757600080fd5b612710821061034557600080fd5b5042810160068190555b5b919050565b600160a060020a033016315b90565b600254600160a060020a031681565b60005433600160a060020a0390811691161461038e57600080fd5b600054600160a060020a0316ff5b5b565b6006545b90565b60035460009033600160a060020a039081169116146103c457600080fd5b600254600160a060020a03163480156108fc0290604051600060405180830381858888f1935050505015156103f857600080fd5b5060015b5b90565b600054600160a060020a031681565b600154600160a060020a031681565b60015b90565b600354600160a060020a031681565b600060065442111561044f57610447610373565b506000610361565b50600654610361565b5b90565b60035460009033600160a060020a0390811691161461047a57600080fd5b6000610484610433565b1161048e57600080fd5b600454841461049c57600080fd5b60055483146104aa57600080fd5b600160a060020a03301631829010156104c257600080fd5b600160a060020a03331682156108fc0283604051600060405180830381858888f1935050505015156104f357600080fd5b5060015b5b93925050505600a165627a7a723058204c9b81e79d7005437368dd588aaf4ed10db5b6b68b0c66f49e52ac8f837e5bbf0029",
+  "unlinked_binary": "0x6060604052341561000f57600080fd5b60405160a080610c0883398101604052808051919060200180519190602001805191906020018051919060200180519150505b5b60008054600160a060020a03191633600160a060020a03161790555b60018054600160a060020a03808816600160a060020a031992831617909255600280548784169083161790556003805492861692909116919091179055600482905560058190556103e8420160068190557f9af0497ebe84742251ed528f4961d99bcc917b3ea0b78d1bc22cc20673fc10549060405190815260200160405180910390a15b50505050505b610b0f806100f96000396000f300606060405236156100ca5763ffffffff60e060020a600035041663046f7da281146100cf578063155dd5ee146100e4578063341c45c01461010c578063410085df1461013457806341c0e1b51461016a578063460b38361461017f5780635195bd29146101a4578063591965d4146101c95780638456cb59146101e35780638ffe5d3e146101f85780639b15ec1114610228578063a26759cb14610250578063b15022661461026a578063b1a1165f1461028f578063de064c1c146102ab578063e83a470b146102d0575b600080fd5b34156100da57600080fd5b6100e26102f5565b005b34156100ef57600080fd5b6100fa600435610350565b60405190815260200160405180910390f35b341561011757600080fd5b6100fa600435610418565b60405190815260200160405180910390f35b341561013f57600080fd5b610156600160a060020a03600435166024356104a2565b604051901515815260200160405180910390f35b341561017557600080fd5b6100e2610582565b005b341561018a57600080fd5b6100fa6105c6565b60405190815260200160405180910390f35b34156101af57600080fd5b6100fa6105cd565b60405190815260200160405180910390f35b6100fa6105ee565b60405190815260200160405180910390f35b34156101ee57600080fd5b6100e2610672565b005b341561020357600080fd5b6101566004356024356044356106d3565b604051901515815260200160405180910390f35b341561023357600080fd5b6100fa6004356107ef565b60405190815260200160405180910390f35b6100fa6108cb565b60405190815260200160405180910390f35b341561027557600080fd5b6100fa61094f565b60405190815260200160405180910390f35b610156610956565b604051901515815260200160405180910390f35b34156102b657600080fd5b6100fa610a99565b60405190815260200160405180910390f35b34156102db57600080fd5b6100fa610ac2565b60405190815260200160405180910390f35b60005433600160a060020a0390811691161461031057600080fd5b6000805460a060020a60ff02191690557f40d92f6595e0d28e9a576afe0abb824e6d95e372a3b8dc2bc78a6383c42e361160405160405180910390a15b5b565b60015460009033600160a060020a0390811691161461036e57600080fd5b60005460a060020a900460ff161561038557600080fd5b60075482111561039457600080fd5b600780548390039055600154600160a060020a031682156108fc0283604051600060405180830381858888f1935050505015156103d057600080fd5b7f097a5396b32856c335a54e6c37a9202d0b97e4ec85d3505420908fbd1d4e042a8260075460405191825260208201526040908101905180910390a1506007545b5b5b919050565b60015460009033600160a060020a0390811691161461043657600080fd5b60005460a060020a900460ff161561044d57600080fd5b612710821061045b57600080fd5b42820160068190557fc6b03f8a57c694a7b14dbb6ee0a95fc276d667f5fb558f232dfd5072abda37bd9060405190815260200160405180910390a1506006545b5b5b919050565b6000805433600160a060020a039081169116146104be57600080fd5b60005460a060020a900460ff1615156104d657600080fd5b600160a060020a033016318211156104ed57600080fd5b600160a060020a038316151561050257600080fd5b600160a060020a03831682156108fc0283604051600060405180830381858888f19350505050151561053357600080fd5b7f6e148ee0ab828e30535da2813e8b9dea873744b79cb73ead1fad018a446474ab8383604051600160a060020a03909216825260208201526040908101905180910390a15060015b5b92915050565b60005433600160a060020a0390811691161461059d57600080fd5b60005460a060020a900460ff1615156105b557600080fd5b600054600160a060020a0316ff5b5b565b600a545b90565b6000805460a060020a900460ff16156105e557600080fd5b506007545b5b90565b60015460009033600160a060020a0390811691161461060c57600080fd5b60005460a060020a900460ff161561062357600080fd5b6008805434908101918290557f16e75a6dd510976327d4490ac8348abe75b1b497e0afd1a2253b6836246d748b9160405191825260208201526040908101905180910390a1506008545b5b5b90565b60005433600160a060020a0390811691161461068d57600080fd5b6000805460a060020a60ff02191660a060020a1790557f72df6bf35847e0a8fbefeb8d73edcb2c3db611a4b537c4ce1ab107dbd0c580bd60405160405180910390a15b5b565b60035460009033600160a060020a039081169116146106f157600080fd5b60005460a060020a900460ff161561070857600080fd5b6000610712610a99565b1161071c57600080fd5b600a541561072957600080fd5b6007546000901161073957600080fd5b6008548290101561074957600080fd5b600454841461075757600080fd5b600554831461076557600080fd5b600982905560078054600a8190556000909155600354600160a060020a03169080156108fc0290604051600060405180830381858888f1935050505015156107ac57600080fd5b7f4acee0941565f69ccaf99f60682723ae8448780a6821a1db987d208164a47052600a5460405190815260200160405180910390a15060015b5b5b5b9392505050565b60015460009033600160a060020a0390811691161461080d57600080fd5b60005460a060020a900460ff161561082457600080fd5b60085482111561083357600080fd5b600954600854839003101561084757600080fd5b600880548390039055600154600160a060020a031682156108fc0283604051600060405180830381858888f19350505050151561088357600080fd5b7fec1c8d26381008a587f0906ce3a79747ae126644f9d27c6ab807c5add5436e6d8260085460405191825260208201526040908101905180910390a1506008545b5b5b919050565b60015460009033600160a060020a039081169116146108e957600080fd5b60005460a060020a900460ff161561090057600080fd5b6007805434908101918290557f8d64ca433e6e88b1c3446257dd1998f56d99c0ebaa81c49fc398c911318bd1bd9160405191825260208201526040908101905180910390a1506007545b5b5b90565b600b545b90565b60035460009033600160a060020a0390811691161461097457600080fd5b60005460a060020a900460ff161561098b57600080fd5b600b541561099857600080fd5b60095460085410156109a957600080fd5b600954600b81905560088054919091039055600254600160a060020a03163480156108fc0290604051600060405180830381858888f1935050505015156109ef57600080fd5b600354600954600160a060020a039091169080156108fc0290604051600060405180830381858888f193505050501515610a2857600080fd5b7f2e9a3747b4f8f9c8d8ce5ff043a13e22f6ae589bca92a15985e6387ed2a303a73460405190815260200160405180910390a17f43fb247a79a843e9525fb1d60bba7e6e8b4ecefef51fc6e1edc0d783e47c87e360095460405190815260200160405180910390a15060015b5b5b90565b6000600654421115610ab557610aad610672565b5060006105ca565b506006546105ca565b5b90565b6000805460a060020a900460ff1615610ada57600080fd5b506008545b5b905600a165627a7a72305820ae0cc6f5b8c2155c53d5fbe3fe55ed84ab789edaee7e432c0f5da9467712abf40029",
   "networks": {
     "42": {
-      "events": {},
+      "events": {
+        "0x9af0497ebe84742251ed528f4961d99bcc917b3ea0b78d1bc22cc20673fc1054": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_deadLine",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceNew",
+          "type": "event"
+        },
+        "0x8d64ca433e6e88b1c3446257dd1998f56d99c0ebaa81c49fc398c911318bd1bd": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "name": "_availableFunds",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceAddFunds",
+          "type": "event"
+        },
+        "0x097a5396b32856c335a54e6c37a9202d0b97e4ec85d3505420908fbd1d4e042a": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "name": "_availableFunds",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceWithdrawFunds",
+          "type": "event"
+        },
+        "0x16e75a6dd510976327d4490ac8348abe75b1b497e0afd1a2253b6836246d748b": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "name": "_commissionToExchangeAmount",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceAddCommissionFunds",
+          "type": "event"
+        },
+        "0xec1c8d26381008a587f0906ce3a79747ae126644f9d27c6ab807c5add5436e6d": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "name": "_commissionToExchangeAmount",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceWithdrawCommissionFunds",
+          "type": "event"
+        },
+        "0xc6b03f8a57c694a7b14dbb6ee0a95fc276d667f5fb558f232dfd5072abda37bd": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_newDeadLine",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceSetDeadLine",
+          "type": "event"
+        },
+        "0x4acee0941565f69ccaf99f60682723ae8448780a6821a1db987d208164a47052": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceSendFundsToExchange",
+          "type": "event"
+        },
+        "0x2e9a3747b4f8f9c8d8ce5ff043a13e22f6ae589bca92a15985e6387ed2a303a7": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceSendFundsFromExchangeToBeneficiary",
+          "type": "event"
+        },
+        "0x43fb247a79a843e9525fb1d60bba7e6e8b4ecefef51fc6e1edc0d783e47c87e3": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_commissionToTransfer",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogRemittanceSendCommissionToExchange",
+          "type": "event"
+        },
+        "0x72df6bf35847e0a8fbefeb8d73edcb2c3db611a4b537c4ce1ab107dbd0c580bd": {
+          "anonymous": false,
+          "inputs": [],
+          "name": "LogBasePause",
+          "type": "event"
+        },
+        "0x40d92f6595e0d28e9a576afe0abb824e6d95e372a3b8dc2bc78a6383c42e3611": {
+          "anonymous": false,
+          "inputs": [],
+          "name": "LogBaseResume",
+          "type": "event"
+        },
+        "0x6e148ee0ab828e30535da2813e8b9dea873744b79cb73ead1fad018a446474ab": {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "name": "_address",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "LogBaseRefund",
+          "type": "event"
+        }
+      },
       "links": {},
-      "address": "0x3eee33a395bad09dd7db059b2431e439316d4116",
-      "updated_at": 1515751624215
+      "address": "0x75825f09321e0923e2a90734d58381c4d4aab626",
+      "updated_at": 1516134568711
     }
   },
   "schema_version": "0.0.5",
-  "updated_at": 1515751624215
+  "updated_at": 1516134568711
 }

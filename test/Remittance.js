@@ -18,38 +18,36 @@ contract('Remittance', function(accounts) {
     });
 
     it("Alice sends funds", () => {
-        let fundsBefore, fundsAfter;
+        let fundsBefore;
 
-        console.log("it:Alice sends funds");
+        console.log("it:Alice sends funds to the contract");
 
-        return instance.viewFunds.call().then((r) => {
+        return instance.getAvailableFunds.call().then((r) => {
             fundsBefore = r;
-                console.log("  fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
+            console.log("  Contract funds before = " + web3.fromWei(fundsBefore,"ether").toString(10));
             return instance.addFunds({from:alice, value:web3.toWei(0.2, "ether")});
         }).then(() => {
-            return instance.viewFunds.call();
+            return instance.getAvailableFunds.call();
         }).then((r) => {
-            fundsAfter = r;
-                console.log("  fundsAfter = " + web3.fromWei(fundsAfter,"ether").toString(10));
-            assert.isBelow(fundsBefore, fundsAfter, "ERROR: fundsAfter is not greater than fundsBefore");
+            console.log("  Contract funds after = " + web3.fromWei(r,"ether").toString(10));
+            assert.isBelow(+fundsBefore, +r, "ERROR: funds after are not greater than funds before");
         });
     });
 
     it("Alice withdraws funds", () => {
-        let fundsBefore, fundsAfter;
+        let fundsBefore;
 
         console.log("it:Alice withdraws funds");
 
-        return instance.viewFunds.call().then((r) => {
+        return instance.getAvailableFunds.call().then((r) => {
             fundsBefore = r;
-                console.log("  fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
+            console.log("  Contract funds before = " + web3.fromWei(fundsBefore,"ether").toString(10));
             return instance.withdrawFunds(web3.toWei(0.05, "ether"), {from:alice});
         }).then(() => {
-            return instance.viewFunds.call();
+            return instance.getAvailableFunds.call();
         }).then((r) => {
-            fundsAfter = r;
-                console.log("  fundsAfter = " + web3.fromWei(fundsAfter,"ether").toString(10));
-            assert.isAbove(fundsBefore, fundsAfter, "ERROR: fundsBefore is not greater than fundsAfter");
+            console.log("  Contract funds after = " + web3.fromWei(r,"ether").toString(10));
+            assert.isAbove(+fundsBefore, +r, "ERROR: Contract funds before are not greater than funds after");
         });
     });
 
@@ -58,7 +56,7 @@ contract('Remittance', function(accounts) {
         return instance.checkDeadLine.call().then((r) => {
             if (r == 0) {
                 return instance.setDeadLine.call(1000).then((r) => {
-                    console.log("  Deadline expired. Extended to: " + r.toString());
+                console.log("  Deadline expired. Extended to: " + r.toString());
                 });
             } else {
                 console.log("  Deadline not expired. Deadline = " + r.toString());
@@ -67,48 +65,71 @@ contract('Remittance', function(accounts) {
     });
 
     it("Carol transfers funds to her exchange", () => {
-        let fundsBefore, fundsAfter;
-        let transferAmount = web3.toWei(0.1, "ether");
+        let fundsBefore, transferredAmount;
+        let commission = web3.toWei(0.01, "ether");
 
         console.log("it: Carol transfers funds to her exchange");
         console.log("  Carol funds before = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
 
-        return instance.viewFunds.call().then((r) => {
+        return instance.getAvailableFunds.call().then((r) => {
             fundsBefore = r.toNumber();
-                console.log("  Contract fundsBefore = " + web3.fromWei(fundsBefore,"ether").toString(10));
-            return instance.fundsToExchange(password1, password2, transferAmount, {from:carol});
-        }).then(() => {
-                console.log("  transferAmount = " + web3.fromWei(transferAmount,"ether").toString(10));
-            return instance.viewFunds.call();
+            console.log("  Contract funds before = " + web3.fromWei(fundsBefore,"ether").toString(10));
+            return instance.getCommissionFunds.call();
         }).then((r) => {
-            fundsAfter = r.toNumber();
-                console.log("  Contract fundsAfter = " + web3.fromWei(fundsAfter,"ether").toString(10));
-                console.log("  Carol funds after = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
-            assert.equal(+fundsBefore, +fundsAfter + +transferAmount, "ERROR: Funds not transfered to Exchange");
+            console.log("  Commission funds before = " + web3.fromWei(r,"ether").toString(10));
+            console.log("  Alice adds commission funds");
+            return instance.addCommissionFunds({from:alice, value:commission});
+        }).then(() => {
+            return instance.getCommissionFunds.call();
+        }).then((r) => {
+            console.log("  Commission funds after = " + web3.fromWei(r,"ether").toString(10));
+            console.log("  Carol requests funds to be sent to her exchange...");
+            return instance.sendFundsToExchange(password1, password2, commission, {from:carol});
+        }).then(() => {
+            return instance.getTransferredAmount.call();
+        }).then((r) => {
+            transferredAmount = r.toNumber();
+            console.log("  Transferred Amount = " + web3.fromWei(r,"ether").toString(10));
+            return instance.getAvailableFunds.call();
+        }).then((r) => {
+            console.log("  Contract funds after = " + web3.fromWei(r,"ether").toString(10));
+            console.log("  Carol funds after = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
+            assert.equal(+fundsBefore, +r + +transferredAmount, "ERROR: Funds not transferred to Exchange");
         });
     });
 
     it("Carol transfer funds to Bob", () => {
         let bobFundsBefore, bobFundsAfter;
-        let transferAmount = web3.toWei(0.1, "ether") * 0.97; //Carol takes a 3% commission
+        let carolFundsBefore, carolFundsAfter; //Shall increase due to the commission
+        let transferAmount = web3.toWei(0.1, "ether");
 
         console.log("it:Carol transfer funds to Bob");
-        console.log("  Carol funds before = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
+        carolFundsBefore =  web3.fromWei(web3.eth.getBalance(carol),"ether");
+        console.log("  Carol funds before = " + carolFundsBefore.toString(10));
 
         bobFundsBefore = web3.fromWei(web3.eth.getBalance(bob),"ether");
-            console.log("  Bob funds before = " + bobFundsBefore.toFixed(5).toString(10));
-            console.log("  Transfer amount = " + web3.fromWei(transferAmount,"ether").toString(10));
+        console.log("  Bob funds before = " + bobFundsBefore.toFixed(5).toString(10));
+        console.log("  Transfer amount = " + web3.fromWei(transferAmount,"ether").toString(10));
 
-        return instance.exchangeToBeneficiary({from:carol, value:transferAmount}).then(() => {
+        return instance.getCommissionFunds.call().then((r) => {
+            console.log("  Commission funds before = " + web3.fromWei(r,"ether").toString(10));
+            console.log("  Carol sends funds to Bob and gets the commission paid...");
+            return instance.sendFundsFromExchangeToBeneficiary({from:carol, value:transferAmount});
+        }).then(() => {
+            return instance.getCommissionFunds.call();
+        }).then((r) => {
+            console.log("  Commission funds after = " + web3.fromWei(r,"ether").toString(10));
             bobFundsAfter = web3.fromWei(web3.eth.getBalance(bob),"ether");
-                console.log("  Bob funds after = " + bobFundsAfter.toFixed(5).toString(10));
-                console.log("  Carol funds after = " + web3.fromWei(web3.eth.getBalance(carol),"ether").toString(10));
+            console.log("  Bob funds after = " + bobFundsAfter.toFixed(5).toString(10));
+            carolFundsAfter = web3.fromWei(web3.eth.getBalance(carol),"ether");
+            console.log("  Carol funds after = " + carolFundsAfter.toString(10));
 
-            let t = web3.fromWei(transferAmount,"ether");
-            assert.equal ((+bobFundsBefore + +t).toFixed(5), (+bobFundsAfter).toFixed(5), "ERROR: Bob funds doesn't match");
+            assert.isAbove (+bobFundsAfter, +bobFundsBefore, "ERROR: Bob funds didn't increase");
+            assert.isAbove (+carolFundsAfter + +transferAmount, +carolFundsBefore, "ERROR: Carol funds didn't receive the commission");
         });
     });
 
+/*
     function keccak256(...args) {
         args = args.map(arg => {
           if (typeof arg === 'string') {
@@ -130,4 +151,5 @@ contract('Remittance', function(accounts) {
 
         return web3.sha3(args, { encoding: 'hex' })
       }
+    */
 });
