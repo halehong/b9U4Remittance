@@ -1,19 +1,19 @@
 pragma solidity ^0.4.4;
-import "./Base.sol"; //inherit the Base contract
 
 /*
 Remittance
 You will create a smart contract named Remittance whereby:
 
-there are three people: Alice, Bob & Carol.
-Alice wants to send funds to Bob, but she only has ether & Bob wants to be paid in local currency.
+There are three people: Alice, Bob & Carol:
+- Alice wants to send funds to Bob, but she only has ether & Bob wants to be paid in local currency.
 luckily, Carol runs an exchange shop that converts ether to local currency.
-Therefore, to get the funds to Bob, Alice will allow the funds to be transferred through Carol's Exchange Shop. 
+- Therefore, to get the funds to Bob, Alice will allow the funds to be transferred through Carol's Exchange Shop. 
 Carol will convert the ether from Alice into local currency for Bob (possibly minus commission).
 
 To successfully withdraw the ether from Alice, Carol needs to submit two passwords to Alice's Remittance contract:
   - one password that Alice gave to Carol in an email
   - and another password that Alice sent to Bob over SMS.
+
 Since they each have only half of the puzzle, Bob & Carol need to meet in person so they can supply both passwords to the contract. 
 This is a security measure. It may help to understand this use-case as similar to a 2-factor authentication.
 
@@ -24,219 +24,149 @@ funds and give those to Bob (again, possibly minus commission).
 Of course, for safety, no one should send their passwords to the blockchain in the clear.
 
 Stretch goals:
-add a deadline, after which Alice can claim back the unchallenged Ether
-add a limit to how far in the future the deadline can be
-add a kill switch to the whole contract
-plug a security hole (which one?) by changing one password to the recipient's address
-make the contract a utility that can be used by David, Emma and anybody with an address
-make you, the owner of the contract, take a cut of the Ethers smaller than what it would cost Alice to deploy the same contract herself
+- add a deadline, after which Alice can claim back the unchallenged Ether
+- add a limit to how far in the future the deadline can be
+- add a kill switch to the whole contract
+- plug a security hole (which one?) by changing one password to the recipient's address
+- make the contract a utility that can be used by David, Emma and anybody with an address
+- make you, the owner of the contract, take a cut of the Ethers smaller than what it would cost Alice to deploy the same contract herself
 */
 
-contract Remittance is Base {
-    address private origin; //Alice
-    address private beneficiary; //Bob
-    address private exchange; //Carol
+/*
+Personal note:
+- There shall be at least 2 contracts: Alice's Remittance and Carol's Exchange Shop
+- The Exchange will withdraw the funds from Alice's contract by submitting the 2 passwords
+- Passwords shall be sent over the Net encrypted already and shall match each other
+- Passwords shall not be stored uncrypted in the blockchain
+*/
 
-    bytes32 private password1; //two-factor authentication password 1
-    bytes32 private password2;
+import "./MyShared/Funded.sol";
+    //is Funded includes as well:
+    // - Owned
+    // - Stoppable
 
-    uint private deadLine; //after the deadline the funds are reverted back to origin
-    uint private availableFunds; //total available funds
-    uint private commissionFunds; //Origin shall deposit comission funds to be paid to exchange
-    uint private commissionRequested; //store the commission requested by the exchange upon withdrawal
-    uint private transferredAmount; //stores how much has been transferred to the exchange
-    uint private transferredCommission; //stores how much has been transferred to the exchange as a commission
+    // Kill switch implemented in the Stoppable super contract
 
-    event LogRemittanceNew(uint _deadLine);
-    event LogRemittanceAddFunds(uint _amount, uint _availableFunds);
-    event LogRemittanceWithdrawFunds(uint _amount, uint _availableFunds);
-    event LogRemittanceAddCommissionFunds(uint _amount, uint _commissionToExchangeAmount);
-    event LogRemittanceWithdrawCommissionFunds(uint _amount, uint _commissionToExchangeAmount);
-    event LogRemittanceSetDeadLine (uint _newDeadLine);
-    event LogRemittanceSendFundsToExchange (uint _amount);
-    event LogRemittanceSendFundsFromExchangeToBeneficiary (uint _amount);
-    event LogRemittanceSendCommissionToExchange (uint _commissionToTransfer);
+contract Remittance is Funded {
+    // Alice's Remittance contract
+    uint deadline;
+    uint deadlineLimit;
 
-    function Remittance (address _origin, address _beneficiary, address _exchange, bytes32 _password1, bytes32 _password2) public {
-        origin = _origin;
-        beneficiary = _beneficiary;
-        exchange = _exchange;
-        password1 = _password1; //passwords shall come already encryted to avoid any unencrypted communication
-        password2 = _password2;
-        deadLine = now + 1000; //default deadline
+    uint constant DEADLINELIMIT = 365 * 86400 / 15; // 2,102,40 = 1 year of blocks
 
-        LogRemittanceNew(deadLine);
+    struct Transfer {
+        uint amount;
+        uint deadline;
+    }
+    mapping (bytes32 => Transfer) transfersWithExchange; //hashKey => Transfer
+
+        event LogRemittanceNew (address _sender, uint _deadlineLimit);
+        // Constructor
+    function Remittance (uint _deadlineLimit)
+        public
+    {
+        if (_deadlineLimit == 0) 
+            deadlineLimit = DEADLINELIMIT; // Default deadline
+        else
+            deadlineLimit = _deadlineLimit;
+
+        LogRemittanceNew (msg.sender, _deadlineLimit);
     }
 
-    modifier onlyOrigin() {
-        require(msg.sender == origin);
-        _;
+    function isExpired (bytes32 _hashKey) 
+        constant
+        public 
+        returns(bool _isExpired) 
+    {
+        if (now > transfersWithExchange[_hashKey].deadline)
+            return true;
+        else 
+            return false;        
     }
 
-    modifier onlyExchange() {
-        require (msg.sender == exchange);
-        _;
+        // PRIVATE
+        // The function is CONSTANT so the call and return values are NOT sent to the network but executed in our local copy
+        // --> This keeps this calculation "off-chain"
+    function newHashKey (bytes32 _pwdBeneficiary, address _beneficiary, bytes32 _pwdExchange)
+        pure
+        private
+        returns (bytes32 _hashKey)
+    {
+        return keccak256 (_pwdBeneficiary, _beneficiary, _pwdExchange);
     }
 
-    function getTransferredAmount() public constant returns (uint _transferredAmount) {
-        return transferredAmount;
+        // Public interface for newHashKey function
+        // Limited to be executed only by the Owner
+    function newTransferHashKey (bytes32 _pwdBeneficiary, address _beneficiary, bytes32 _pwdExchange)
+        onlyOwner
+        view
+        public
+        returns (bytes32 _hashKey)
+    {
+        return newHashKey (_pwdBeneficiary, _beneficiary, _pwdExchange);
     }
 
-    function getTransferredCommission() public constant returns (uint _transferredCommission) {
-        return transferredCommission;
-    }
+        event LogRemittanceNewTransferWithExchange (address _sender, bytes32 _hashKey, uint _amount, uint _deadline);
+        // Owner will use this function to register a new transaction to a beneficiary via an exchange
+        // Reminder: Funded.sol provides the deposit and withdrawal functions for Owner
+    function newTransferWithExchange (bytes32 _hashKey, uint _amount, uint _deadline)
+        onlyOwner
+        onlyIfRunning
+        public
+        returns (bool _success)
+    {
+        require (_amount > 0);
 
-    function addFunds() onlyOrigin isNotPaused public payable returns(uint _availableFunds) {
-        //
-        // Add funds to the contract and keep accounting of them
-        // Requires:
-        //   - msg.sender == origin
-        //   - Contract is not paused
-        //
-        availableFunds += msg.value;
+        require (_deadline > 0);
+        require (_deadline <= deadlineLimit);
 
-        LogRemittanceAddFunds(msg.value, availableFunds);
-        return availableFunds;
-    }
+        transfersWithExchange[_hashKey].amount = _amount; //regiter the NEW transfer
+        transfersWithExchange[_hashKey].deadline = now + _deadline; 
 
-    function withdrawFunds(uint _amount) onlyOrigin isNotPaused public returns(uint _availableFunds) {
-        //
-        // Function that allows origin to withdraw any submitted funds to adjust the quantity
-        // Requires:
-        //   - msg.sender == origin
-        //   - Contract is not paused
-        //   - _amount <= available funds
-        //
-        require (_amount <= availableFunds); //prevent re-entry
-
-        availableFunds -= _amount; //optimistic accounting
-
-        origin.transfer(_amount);
-
-        LogRemittanceWithdrawFunds(_amount, availableFunds);
-        return availableFunds;
-    }
-
-    function getAvailableFunds () isNotPaused public constant returns(uint _availableFunds) {
-        return availableFunds;
-    }
-
-    function addCommissionFunds () onlyOrigin isNotPaused public payable returns(uint _commissionToExchangeAmount) {
-        //
-        // Function to add commission to exchange funds
-        // Requires:
-        //   - msg.sender == origin
-        //   - Contract is not paused
-        //
-        commissionFunds += msg.value;
-
-        LogRemittanceAddCommissionFunds(msg.value, commissionFunds);
-        return commissionFunds;
-    }
-
-    function withdrawCommissionFunds (uint _amount) onlyOrigin isNotPaused public returns(uint _commissionToExchangeAmount) {
-        //
-        // Function that allows origin to withdraw any submitted funds to adjust the quantity
-        // Requires:
-        //   - msg.sender == origin
-        //   - Contract is not paused
-        //   - _amount <= available commisions funds
-        //   - commissionFunds - _amount >= commissionRequested to prevent not having enough commission funds to pay the already promissed commission
-        //
-        require (_amount <= commissionFunds); //prevent re-entry
-        require (commissionFunds - _amount >= commissionRequested);
-
-        commissionFunds -= _amount; //optimistic accounting
-
-        origin.transfer(_amount);
-
-        LogRemittanceWithdrawCommissionFunds(_amount, commissionFunds);
-        return commissionFunds;
-    }
-
-    function getCommissionFunds () isNotPaused public constant returns(uint _commissionToExchangeAmount) {
-        return commissionFunds;
-    }
-
-    function setDeadLine(uint _extension) onlyOrigin isNotPaused public returns(uint _deadLine) {
-        //
-        // Function to set the deadline to any point in the future
-        // Requires:
-        //   - msg.sender == origin
-        //   - Contract is not paused
-        //   - _extension < 10000 to prevent too far in the future deadlines
-        //
-        require(_extension < 10000);
-
-        deadLine = now + _extension;
-
-        LogRemittanceSetDeadLine (deadLine);
-        return deadLine;
-    }
-
-    function checkDeadLine () public returns(uint _deadline) {
-        if (now > deadLine) {
-            pause(); //if the deadline is passed, pause the contract
-            return 0;
-        } else {
-            return deadLine;
-        }
-    }
-
-    modifier isNotExpired () {
-        require(checkDeadLine() > 0);
-        _;
-    }
-
-    function sendFundsToExchange (bytes32 _password1, bytes32 _password2, uint _commission) onlyExchange isNotPaused isNotExpired public returns (bool _success) {
-        //
-        // Send the requested amount to the exchange account
-        // Requires:
-        //   - msg.sender == exchange account
-        //   - Contract is not paused
-        //   - Deadline not expired
-        //   - Funds shall not be already sent to the exchange. Prevents re-entry
-        //   - There are funds to send
-        //   - The commissions amount stored in the contract are enough to pay the exchange
-        //   - Submitted passwords to match stored passwords
-        //
-        require (transferredAmount == 0); //prevent re-entry
-        require (availableFunds > 0); //there are funds to send
-        require (commissionFunds >= _commission); //check that the required commission is avaialble
-
-        require (_password1 == password1); //check passwords
-        require (_password2 == password2); //check passwords
-
-        commissionRequested = _commission; //store the requested commission for later verification
-        transferredAmount = availableFunds; //optimistic accounting
-        availableFunds = 0;
-
-        exchange.transfer(transferredAmount);
-
-        LogRemittanceSendFundsToExchange (transferredAmount);
+        LogRemittanceNewTransferWithExchange (msg.sender, _hashKey, _amount, now + _deadline);
         return true;
     }
 
-    function sendFundsFromExchangeToBeneficiary () onlyExchange isNotPaused public payable returns(bool _success) {
-        //
-        // Sends the
-        // Requires:
-        //   - msg.sender == exchange account
-        //   - Contract is not paused
-        //   - The commissions has not been already paid. Prevents re-entry
-        //   - The commissions amount stored in the contract are enough to pay the exchange
-        //
-        require (transferredCommission == 0); //prevent re-entry
-        require (commissionFunds >= commissionRequested); //ensure enough commission funds
+        event LogRemittanceRemoveTransferWithExchange (address _sender, bytes32 _hashKey);
+        // Owner can decide to remove an existing registered transfer
+    function removeTransferWithExchange (bytes32 _hashKey)
+        onlyOwner
+        public
+        returns (bool _success)
+    {
+        delete transfersWithExchange[_hashKey];
 
-        transferredCommission = commissionRequested; //optimistic accounting
-        commissionFunds -= commissionRequested;
+        LogRemittanceRemoveTransferWithExchange (msg.sender, _hashKey);
+        return true;
+    }
 
-        beneficiary.transfer(msg.value); //As the transfer is in another currency we cannot check the amount to be transferred
-        exchange.transfer(commissionRequested);
+    function getTransferWithExchange (bytes32 _hashKey)
+        constant
+        public
+        returns (uint _amount, uint _deadline)
+    {
+        return (transfersWithExchange[_hashKey].amount, transfersWithExchange[_hashKey].deadline);
+    }
 
-        LogRemittanceSendFundsFromExchangeToBeneficiary (msg.value);
-        LogRemittanceSendCommissionToExchange (commissionRequested);
+        event LogRemittanceWithdrawFromExchange (address _sender, address _beneficiary, uint _withdrawalAmount);
+        // Function to be executed from the Exchange address to withdraw the funds for the beneficiary
+        // If the exchange sends the correct passwords and beneficiary address, the resultant hash key will already exist in our mapping
+    function withdrawFromExchange (address _beneficiary, bytes32 _password1, bytes32 _password2)
+        onlyIfRunning
+        public
+        returns (bool _success)
+    {
+        bytes32 withdrawalHashKey = newHashKey (_password1, _beneficiary, _password2); //calls the PRIVATE function
+
+        uint withdrawalAmount = transfersWithExchange[withdrawalHashKey].amount;
+        require (withdrawalAmount > 0); //prevent re-entry
+        require (getContractBalance() >= withdrawalAmount); //prevent over spending
+        require (!isExpired(withdrawalHashKey)); //prevent withdrawal when expired
+
+        delete transfersWithExchange[withdrawalHashKey]; //optimistic accounting
+        msg.sender.transfer(withdrawalAmount); //transfer to exchange
+
+        LogRemittanceWithdrawFromExchange (msg.sender, _beneficiary, withdrawalAmount);
         return true;
     }
 }
