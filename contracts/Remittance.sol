@@ -34,43 +34,54 @@ Stretch goals:
 
 /*
 Personal note:
-- There shall be at least 2 contracts: Alice's Remittance and Carol's Exchange Shop
 - The Exchange will withdraw the funds from Alice's contract by submitting the 2 passwords
 - Passwords shall be sent over the Net encrypted already and shall match each other
 - Passwords shall not be stored uncrypted in the blockchain
 */
 
+/* 
+--- Workflow ---
+    Alice (depositor) deposits funds into the Remittance contract
+        These funds shall include as well the commission that the Remittance contract will charge
+    Alice requests a transfer hash key with the 2 passwords and the address of the chosen Exchange
+        The required funds will be taken by the Remittance contract
+        Alice can change her mind and cancel the Transfer. This will soft credit back her funds
+    The Exchange account (Carol) will withdraw the funds by submitting the 2 passwords
+        The Remittance contract will take the commission fees
+        The transfer will be deleted
+    Alice can withdraw any reminding funds
+*/
 import "./MyShared/Funded.sol";
     //is Funded includes as well:
     // - Owned
     // - Stoppable
-
     // Kill switch implemented in the Stoppable super contract
-
 contract Remittance is Funded {
-    // Alice's Remittance contract
-    uint deadline;
-    uint deadlineLimit;
+    uint private deadlineLimit;
 
     uint constant DEADLINELIMIT = 365 * 86400 / 15; // 2,102,40 = 1 year of blocks
+    uint transferCommission;
 
     struct Transfer {
+        address sender;
         uint amount;
         uint deadline;
     }
-    mapping (bytes32 => Transfer) transfersWithExchange; //hashKey => Transfer
+    mapping (bytes32 => Transfer) transfers; //hashKey => Transfer
 
-        event LogRemittanceNew (address _sender, uint _deadlineLimit);
+        event LogRemittanceNew (address _sender, uint _deadlineLimit, uint _transferCommission);
         // Constructor
-    function Remittance (uint _deadlineLimit)
+    function Remittance (uint _deadlineLimit, uint _transferCommission)
         public
     {
+        transferCommission = _transferCommission;
+
         if (_deadlineLimit == 0) 
             deadlineLimit = DEADLINELIMIT; // Default deadline
         else
             deadlineLimit = _deadlineLimit;
 
-        LogRemittanceNew (msg.sender, _deadlineLimit);
+        LogRemittanceNew (msg.sender, _deadlineLimit, _transferCommission);
     }
 
     function isExpired (bytes32 _hashKey) 
@@ -78,39 +89,27 @@ contract Remittance is Funded {
         public 
         returns(bool _isExpired) 
     {
-        if (now > transfersWithExchange[_hashKey].deadline)
+        if (now > transfers[_hashKey].deadline)
             return true;
         else 
             return false;        
     }
 
-        // PRIVATE
-        // The function is CONSTANT so the call and return values are NOT sent to the network but executed in our local copy
-        // --> This keeps this calculation "off-chain"
-    function newHashKey (bytes32 _pwdBeneficiary, address _beneficiary, bytes32 _pwdExchange)
+        // Hashing function calculated with both passwords and the address of the exchange that we trust (_withdrawer)
+        // --> Hashing with the exchange address ensures us that only the exchange will be able to withdraw the funds
+        // PURE so the execution of this function doesn't go to the network but will be executed in our local copy
+    function newTransferHashKey (address _withdrawer, bytes32 _pwdBeneficiary, bytes32 _pwdExchange)
         pure
-        private
-        returns (bytes32 _hashKey)
-    {
-        return keccak256 (_pwdBeneficiary, _beneficiary, _pwdExchange);
-    }
-
-        // Public interface for newHashKey function
-        // Limited to be executed only by the Owner
-    function newTransferHashKey (bytes32 _pwdBeneficiary, address _beneficiary, bytes32 _pwdExchange)
-        onlyOwner
-        view
         public
         returns (bytes32 _hashKey)
     {
-        return newHashKey (_pwdBeneficiary, _beneficiary, _pwdExchange);
+        return keccak256 (_withdrawer, _pwdBeneficiary, _pwdExchange);
     }
 
-        event LogRemittanceNewTransferWithExchange (address _sender, bytes32 _hashKey, uint _amount, uint _deadline);
+        event LogRemittanceNewTransfer (address _sender, bytes32 _hashKey, uint _amount, uint _deadline);
         // Owner will use this function to register a new transaction to a beneficiary via an exchange
         // Reminder: Funded.sol provides the deposit and withdrawal functions for Owner
-    function newTransferWithExchange (bytes32 _hashKey, uint _amount, uint _deadline)
-        onlyOwner
+    function newTransfer (bytes32 _hashKey, uint _amount, uint _deadline)
         onlyIfRunning
         public
         returns (bool _success)
@@ -120,53 +119,58 @@ contract Remittance is Funded {
         require (_deadline > 0);
         require (_deadline <= deadlineLimit);
 
-        transfersWithExchange[_hashKey].amount = _amount; //regiter the NEW transfer
-        transfersWithExchange[_hashKey].deadline = now + _deadline; 
+        transfers[_hashKey].amount = _amount; //regiter the NEW transfer
+        transfers[_hashKey].deadline = now + _deadline;
+        transfers[_hashKey].sender = msg.sender;
 
-        LogRemittanceNewTransferWithExchange (msg.sender, _hashKey, _amount, now + _deadline);
+        spendFunds(_amount + transferCommission); //account the expenditure of the transfer to the depositor
+
+        LogRemittanceNewTransfer (msg.sender, _hashKey, _amount, now + _deadline);
         return true;
     }
 
-        event LogRemittanceRemoveTransferWithExchange (address _sender, bytes32 _hashKey);
+        event LogRemittanceRemoveTransfer (address _sender, bytes32 _hashKey);
         // Owner can decide to remove an existing registered transfer
-    function removeTransferWithExchange (bytes32 _hashKey)
-        onlyOwner
-        public
-        returns (bool _success)
-    {
-        delete transfersWithExchange[_hashKey];
-
-        LogRemittanceRemoveTransferWithExchange (msg.sender, _hashKey);
-        return true;
-    }
-
-    function getTransferWithExchange (bytes32 _hashKey)
-        constant
-        public
-        returns (uint _amount, uint _deadline)
-    {
-        return (transfersWithExchange[_hashKey].amount, transfersWithExchange[_hashKey].deadline);
-    }
-
-        event LogRemittanceWithdrawFromExchange (address _sender, address _beneficiary, uint _withdrawalAmount);
-        // Function to be executed from the Exchange address to withdraw the funds for the beneficiary
-        // If the exchange sends the correct passwords and beneficiary address, the resultant hash key will already exist in our mapping
-    function withdrawFromExchange (address _beneficiary, bytes32 _password1, bytes32 _password2)
+    function removeTransfer (bytes32 _hashKey)
         onlyIfRunning
         public
         returns (bool _success)
     {
-        bytes32 withdrawalHashKey = newHashKey (_password1, _beneficiary, _password2); //calls the PRIVATE function
+        softRefund(transfers[_hashKey].amount); //account a soft refund to the depositor
+        delete transfers[_hashKey];
 
-        uint withdrawalAmount = transfersWithExchange[withdrawalHashKey].amount;
-        require (withdrawalAmount > 0); //prevent re-entry
-        require (getContractBalance() >= withdrawalAmount); //prevent over spending
+        LogRemittanceRemoveTransfer (msg.sender, _hashKey);
+        return true;
+    }
+
+    function getTransfer (bytes32 _hashKey)
+        constant
+        public
+        returns (uint _amount, uint _deadline)
+    {
+        return (transfers[_hashKey].amount, transfers[_hashKey].deadline);
+    }
+
+        event LogRemittanceWithdrawTransfer (address _sender, uint _transferAmount);
+        // Function to be executed from the Exchange address to withdraw the Transfer funds
+        // If the exchange sends the correct passwords, the resultant hash key will already exist in transfers mapping
+    function withdrawTransfer (bytes32 _password1, bytes32 _password2)
+        onlyIfRunning
+        public
+        returns (bool _success)
+    {
+        bytes32 withdrawalHashKey = newTransferHashKey (msg.sender, _password1, _password2); //the withdrawer address will be used to recalculate the hash key
+
+        uint transferAmount = transfers[withdrawalHashKey].amount;
+        require (transferAmount > 0); //prevent re-entry
         require (!isExpired(withdrawalHashKey)); //prevent withdrawal when expired
+        require (getDepositorBalance(transfers[withdrawalHashKey].sender) >= transferAmount + transferCommission); //prevent over spending
 
-        delete transfersWithExchange[withdrawalHashKey]; //optimistic accounting
-        msg.sender.transfer(withdrawalAmount); //transfer to exchange
+        delete transfers[withdrawalHashKey]; //optimistic accounting
+        msg.sender.transfer(transferAmount); //transfer to exchange
+        getOwner().transfer(transferCommission); //transfer commission to owner
 
-        LogRemittanceWithdrawFromExchange (msg.sender, _beneficiary, withdrawalAmount);
+        LogRemittanceWithdrawTransfer (msg.sender, transferAmount);
         return true;
     }
 }

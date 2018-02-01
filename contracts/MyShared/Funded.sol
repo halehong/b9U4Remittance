@@ -114,6 +114,26 @@ contract Funded is Stoppable {
         return true;
     }
 
+        event LogFundedSoftRefund (address _sender, uint _amount);
+        // INTERNAL
+        // To be called to support revert functions from child contracts
+        // After the depositor have spendFunds(), if the depositor changes his mind he could be refunded if the child contract allows
+        // This is a soft refund as the requested amount will be credited back the depositor
+    function softRefund (uint _amount)
+        onlyDepositors
+        onlyIfRunning
+        internal
+        returns (bool _success)
+    {
+        require (contractBalance >= _amount); //prevent major re-entry
+
+        contractProfit -= _amount;
+        depositors[msg.sender] += _amount;
+
+        LogFundedSoftRefund (msg.sender, _amount);
+        return true;
+    }
+
         event LogFundedAddCashier (address _sender, address _cashier);
         // To add a cashier to the mapping
     function addCashier (address _cashier)
