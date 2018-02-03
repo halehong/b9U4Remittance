@@ -8,9 +8,12 @@ contract Stoppable is Owned {
 
     modifier onlyIfRunning () { require (!stop); _; }
 
+        event LogStoppableNew (address _sender);
     function Stoppable ()
         public
-    {}
+    {
+        LogStoppableNew (msg.sender);
+    }
 
     function isStopped ()
         public

@@ -32,45 +32,42 @@ Stretch goals:
 - make you, the owner of the contract, take a cut of the Ethers smaller than what it would cost Alice to deploy the same contract herself
 */
 
-/*
-Personal note:
-- The Exchange will withdraw the funds from Alice's contract by submitting the 2 passwords
-- Passwords shall be sent over the Net encrypted already and shall match each other
-- Passwords shall not be stored uncrypted in the blockchain
-*/
-
 /* 
---- Workflow ---
-    Alice (depositor) deposits funds into the Remittance contract
-        These funds shall include as well the commission that the Remittance contract will charge
-    Alice requests a transfer hash key with the 2 passwords and the address of the chosen Exchange
-        The required funds will be taken by the Remittance contract
-        Alice can change her mind and cancel the Transfer. This will soft credit back her funds
-    The Exchange account (Carol) will withdraw the funds by submitting the 2 passwords
-        The Remittance contract will take the commission fees
-        The transfer will be deleted
-    Alice can withdraw any reminding funds
+
+Workflow:
+- Sender requests a newHashTicketTransferExchange
+- Sender deposits funds with the hash-ticket
+- Exchange withdraws the funds providing the 2 passwords
+
+Core functions:
+- Constructor
+- newHashTicketTransferExchange
+- depositFundsTransferExchange
+- cancelTransferExchange
+- executeTransferToExchange
+
+Support functions:
+- isExpired
+- getInfoTransfer
+
 */
-import "./MyShared/Funded.sol";
+import "./MyShared/FundsManager.sol";
     //is Funded includes as well:
     // - Owned
     // - Stoppable
-    // Kill switch implemented in the Stoppable super contract
-contract Remittance is Funded {
+contract Remittance is FundsManager {
     uint private deadlineLimit;
+    uint constant DEADLINELIMIT = 365 * 86400 / 15; // 2,102,400 = 1 year of blocks
+    uint constant DEFAULTDEADLINE = 175200; // 1 month
+    uint public transferCommission;
 
-    uint constant DEADLINELIMIT = 365 * 86400 / 15; // 2,102,40 = 1 year of blocks
-    uint transferCommission;
+    mapping (bytes32 => uint ) transfers; //hashTicket => deadline
 
-    struct Transfer {
-        address sender;
-        uint amount;
-        uint deadline;
-    }
-    mapping (bytes32 => Transfer) transfers; //hashKey => Transfer
+// CORE FUNCTIONS
 
         event LogRemittanceNew (address _sender, uint _deadlineLimit, uint _transferCommission);
         // Constructor
+        // If deadlineLimit is not provided the default is applied
     function Remittance (uint _deadlineLimit, uint _transferCommission)
         public
     {
@@ -84,93 +81,114 @@ contract Remittance is Funded {
         LogRemittanceNew (msg.sender, _deadlineLimit, _transferCommission);
     }
 
-    function isExpired (bytes32 _hashKey) 
-        constant
+        // This function "extends" the FundsManager.sol newHashTicket functions to support a 3rd party Exchange
+        // The hash-ticket is calculated with both passwords and the address of the trusted exchange
+        // --> Hashing with the exchange address ensures us that only the exchange will be able to withdraw the funds
+        // PURE so the execution of this function doesn't go to the network but will be executed in our local copy
+    function newHashTicketTransferExchange (address _exchange, bytes32 _pwdBeneficiary, bytes32 _pwdExchange)
+        pure
+        public
+        returns (bytes32 _hashTicket)
+    {
+        return keccak256 (_exchange, _pwdBeneficiary, _pwdExchange);
+    }
+
+        event LogRemittanceDepositFundsTransferExchange (address _sender, bytes32 _hashTicket, uint _deadline);
+        // This function "extends" FundsManager.sol depositFunds()
+        // Adds deadline requirement. If none is provided the default deadline is applied
+    function depositFundsTransferExchange (bytes32 _hashTicket, uint _deadline)
+        onlyIfRunning
+        payable
+        public
+        returns (bool _success)
+    {       
+        require(depositFunds (_hashTicket)); // FundsManager.sol function
+
+        uint newTransferDeadline;
+        
+        if (_deadline == 0)
+        {
+            newTransferDeadline = DEFAULTDEADLINE;
+        }
+        else 
+        {
+            require (_deadline <= deadlineLimit);
+            newTransferDeadline = _deadline;
+        }
+
+        transfers[_hashTicket] = now + newTransferDeadline;
+
+        LogRemittanceDepositFundsTransferExchange (msg.sender, _hashTicket, now + _deadline);
+        return true;
+    }
+
+        event LogRemittanceCancelTransferExchange (address _sender, bytes32 _hashTicket);
+        // This function extends FundsManager.sol withdrawFunds()
+        // Deletes deadline information
+        // Transfers back to sender the funds
+    function cancelTransferExchange (bytes32 _hashTicket)
+        onlyDepositors
+        onlyIfRunning
+        public
+        returns (bool _success)
+    {
+        require (_hashTicket != 0);
+
+        delete transfers[_hashTicket];
+
+        require (withdrawFunds(_hashTicket));
+
+        LogRemittanceCancelTransferExchange (msg.sender, _hashTicket);
+        return true;
+    }
+
+        event LogRemittanceExecuteTransferToExchange (address _sender, uint _transferAmount);
+        // Function to be executed from the Exchange address to withdraw the Transfer funds
+        // If the exchange sends the correct passwords, the resultant hash key will already exist in transfers mapping
+    function executeTransferToExchange (bytes32 _password1, bytes32 _password2)
+        onlyIfRunning
+        public
+        returns (bool _success)
+    {
+        bytes32 hashTicket = newHashTicketTransferExchange (msg.sender, _password1, _password2); //the withdrawer address will be used to recalculate the hash key
+        
+        address depositor;
+        uint256 transferAmount;
+        
+        (depositor, transferAmount) = getInfoDeposit(hashTicket);
+        require (transferAmount > 0); //prevent re-entry
+        require (!isExpired(hashTicket)); //prevent withdrawal when expired
+        
+        chargeCommission(hashTicket, transferCommission); //charge Remittance contract's commission
+        (depositor, transferAmount) = getInfoDeposit(hashTicket);
+
+        delete transfers[hashTicket]; //optimistic accounting
+
+        msg.sender.transfer(transferAmount); //transfer to exchange
+
+        LogRemittanceExecuteTransferToExchange (msg.sender, transferAmount);
+        return true;
+    }
+
+// SUPPORT FUNCTIONS
+
+    function isExpired (bytes32 _hashTicket) 
+        view
         public 
         returns(bool _isExpired) 
     {
-        if (now > transfers[_hashKey].deadline)
+        if (now > transfers[_hashTicket])
             return true;
         else 
             return false;        
     }
 
-        // Hashing function calculated with both passwords and the address of the exchange that we trust (_withdrawer)
-        // --> Hashing with the exchange address ensures us that only the exchange will be able to withdraw the funds
-        // PURE so the execution of this function doesn't go to the network but will be executed in our local copy
-    function newTransferHashKey (address _withdrawer, bytes32 _pwdBeneficiary, bytes32 _pwdExchange)
-        pure
+    function getInfoTransfer (bytes32 _hashTicket)
+        view
         public
-        returns (bytes32 _hashKey)
+        returns (uint256 _amount, uint _deadline)
     {
-        return keccak256 (_withdrawer, _pwdBeneficiary, _pwdExchange);
-    }
-
-        event LogRemittanceNewTransfer (address _sender, bytes32 _hashKey, uint _amount, uint _deadline);
-        // Owner will use this function to register a new transaction to a beneficiary via an exchange
-        // Reminder: Funded.sol provides the deposit and withdrawal functions for Owner
-    function newTransfer (bytes32 _hashKey, uint _amount, uint _deadline)
-        onlyIfRunning
-        public
-        returns (bool _success)
-    {
-        require (_amount > 0);
-
-        require (_deadline > 0);
-        require (_deadline <= deadlineLimit);
-
-        transfers[_hashKey].amount = _amount; //regiter the NEW transfer
-        transfers[_hashKey].deadline = now + _deadline;
-        transfers[_hashKey].sender = msg.sender;
-
-        spendFunds(_amount + transferCommission); //account the expenditure of the transfer to the depositor
-
-        LogRemittanceNewTransfer (msg.sender, _hashKey, _amount, now + _deadline);
-        return true;
-    }
-
-        event LogRemittanceRemoveTransfer (address _sender, bytes32 _hashKey);
-        // Owner can decide to remove an existing registered transfer
-    function removeTransfer (bytes32 _hashKey)
-        onlyIfRunning
-        public
-        returns (bool _success)
-    {
-        softRefund(transfers[_hashKey].amount); //account a soft refund to the depositor
-        delete transfers[_hashKey];
-
-        LogRemittanceRemoveTransfer (msg.sender, _hashKey);
-        return true;
-    }
-
-    function getTransfer (bytes32 _hashKey)
-        constant
-        public
-        returns (uint _amount, uint _deadline)
-    {
-        return (transfers[_hashKey].amount, transfers[_hashKey].deadline);
-    }
-
-        event LogRemittanceWithdrawTransfer (address _sender, uint _transferAmount);
-        // Function to be executed from the Exchange address to withdraw the Transfer funds
-        // If the exchange sends the correct passwords, the resultant hash key will already exist in transfers mapping
-    function withdrawTransfer (bytes32 _password1, bytes32 _password2)
-        onlyIfRunning
-        public
-        returns (bool _success)
-    {
-        bytes32 withdrawalHashKey = newTransferHashKey (msg.sender, _password1, _password2); //the withdrawer address will be used to recalculate the hash key
-
-        uint transferAmount = transfers[withdrawalHashKey].amount;
-        require (transferAmount > 0); //prevent re-entry
-        require (!isExpired(withdrawalHashKey)); //prevent withdrawal when expired
-        require (getDepositorBalance(transfers[withdrawalHashKey].sender) >= transferAmount + transferCommission); //prevent over spending
-
-        delete transfers[withdrawalHashKey]; //optimistic accounting
-        msg.sender.transfer(transferAmount); //transfer to exchange
-        getOwner().transfer(transferCommission); //transfer commission to owner
-
-        LogRemittanceWithdrawTransfer (msg.sender, transferAmount);
-        return true;
+        var(, amount) = getInfoDeposit(_hashTicket);
+        return ( amount, transfers[_hashTicket]);
     }
 }
