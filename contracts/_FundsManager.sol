@@ -36,7 +36,7 @@ pragma solidity ^0.4.4;
 
 */
 
-import "./Stoppable.sol";
+import "./_Stoppable.sol";
 
 contract FundsManager is Stoppable {
     uint256 private contractFunds;
@@ -53,7 +53,9 @@ contract FundsManager is Stoppable {
     modifier onlyDepositors() { require(depositors[msg.sender] > 0); _; }
 
 // CORE FUNCTIONS
+
         event LogFundsManagerNew (address _sender);
+        // Constructor
     function FundsManager() 
         public 
     {

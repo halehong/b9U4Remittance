@@ -51,7 +51,7 @@ Support functions:
 - getInfoTransfer
 
 */
-import "./MyShared/FundsManager.sol";
+import "./_FundsManager.sol";
     //is Funded includes as well:
     // - Owned
     // - Stoppable
